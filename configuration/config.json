@@ -1,0 +1,5 @@
+{"pad_values":0.0,
+"input_quantizer":null,
+"depthwise_quantizer":null,
+"pointwise_quantizer":null,
+"kernel_quantizer":null}

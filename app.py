@@ -1,9 +1,10 @@
+from genericpath import exists
 import click, os, logging, sys, larq
 import tensorflow as tf
 import tensorflow_hub as hub
 from tensorflow.keras.utils import plot_model
 from tensorflow.python.keras.utils import layer_utils
-from tensorflow.keras import layers
+import json
 
 
 def set_logging(log:str):

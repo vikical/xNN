@@ -1,7 +1,11 @@
-import sys
+from configparser import ConfigParser
+from http.client import CONFLICT
+import sys, inspect
 from warnings import filters
 import larq.layers
 import tensorflow.keras as tfkeras
+
+from src import CONFIG
 
 
 class Keras2Larq:
@@ -34,245 +38,46 @@ class Keras2Larq:
 
         return self.__CLASS_PREFIX+keras_classname
               
+    def __instance_larq_layer(self,original_layer,larq_classname):
+        """
+        Instance a LARQ layer, copying common paremeters with Keras layer.
+        No common paremeters has to be configured or passed through the main arguments.
+        """
+        module_name=self.__MODULE_PREFIX
+        class_type= getattr(sys.modules[module_name], larq_classname)
+        parameters_info= inspect.getargspec(class_type.__init__)
 
-    def create_larq_dense(self,original_layer:tfkeras.layers.Dense):        
-        layer=larq.layers.QuantDense(units=original_layer.units,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
+        #We get the values from configuration and from equivalent class in tf.keras.
+        values={}
+        for param in parameters_info.args:
+            if param=="self":
+                continue
 
-    def create_larq_conv1d(self,original_layer:tfkeras.layers.Conv1D):
-        layer=larq.layers.QuantConv1D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        groups=original_layer.groups,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        pad_values=0.0,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
+            # If the parameter has been indicated through the configuration file, we take its value.
+            global CONFIG
+            if param in CONFIG:
+                values[param]=CONFIG.get(param)
+                continue
+        
+            #If no indication has been passed, we get the value from the Keras equivalent.
+            #If it doesn't exist, an Error is thrown.
+            values[param]=getattr(original_layer, param)
 
-    def create_larq_conv2d(self,original_layer:tfkeras.layers.Conv2D):
-        layer=larq.layers.QuantConv2D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,        
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        groups=original_layer.groups,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        pad_values= 0.0,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
 
-    def create_larq_conv3d(self,original_layer:tfkeras.layers.Conv3D):
-        layer=larq.layers.QuantConv3D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        groups=original_layer.groups,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        pad_values=0.0,
-        input_quantizer=None,
-        kernel_quantizer=None
-        )
-        return layer
+        larq_layer= class_type(**values)
 
-    def create_larq_depthwiseconv2d(self,original_layer:tfkeras.layers.DepthwiseConv2D):
-        layer=larq.layers.QuantDepthwiseConv2D(kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        depth_multiplier=original_layer.depth_multiplier,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        depthwise_initializer=original_layer.depthwise_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        depthwise_regularizer=original_layer.depthwise_regularizer,
-        bias_regularizer=original_layer.bias_regulizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        depthwise_constraint=original_layer.depthwise_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        pad_values=0.0,
-        input_quantizer=None,
-        depthwise_quantizer=None)
-        return layer
+        return larq_layer
 
-    def create_larq_separableconv1d(self,original_layer: tfkeras.layers.SeparableConv1D):
-        layer=larq.layers.QuantSeparableConv1D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        depth_multiplier=original_layer.depth_multiplier,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        depthwise_initializer=original_layer.depthwise_initializer,
-        pointwise_initializer=original_layer.pointwise_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        depthwise_regularizer=original_layer.depthwise_regularizer,
-        pointwise_regularizer=original_layer.pointwise_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        depthwise_constraint=original_layer.depthwise_constraint,
-        pointwise_constraint=original_layer.pointwise_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        pad_values=0.0,
-        input_quantizer=None,
-        depthwise_quantizer=None,
-        pointwise_quantizer=None)
-        return layer
 
-    def create_larq_separableconv2d(self,original_layer:tfkeras.layers.SeparableConv2D):
-        layer=larq.layers.QuantSeparableConv2D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        depth_multiplier=original_layer.depth_multiplier,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        depthwise_initializer=original_layer.depthwise_initializer,
-        pointwise_initializer=original_layer.pointwise_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        depthwise_regularizer=original_layer.depthwise_regularizer,
-        pointwise_regularizer=original_layer.pointwise_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        depthwise_constraint=original_layer.depthwise_constraint,
-        pointwise_constraint=original_layer.pointwise_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        pad_values=0.0,
-        input_quantizer=None,
-        depthwise_quantizer=None,
-        pointwise_quantizer=None)
-        return layer
-
-    def create_larq_conv2dtranspose(self,original_layer:tfkeras.layers.Conv2DTranspose):
-        layer=larq.layers.QuantConv2DTranspose(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        output_padding=original_layer.output_padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,        
-        bias_constraint=original_layer.bias_constraint,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
-
-    def create_larq_conv3dtranspose(self,original_layer:tfkeras.layers.Conv3DTranspose):
-        layer=larq.layers.QuantConv3DTranspose(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        output_padding=original_layer.output_padding,
-        data_format=original_layer.data_format,
-        dilation_rate=original_layer.dilation_rate,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
-
-    def create_larq_locallyconnected1d(self,original_layer:tfkeras.layers.LocallyConnected1D):
-        layer=larq.layers.QuantLocallyConnected1D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        implementation=original_layer.implementation,
-        input_quantizer=None,
-        kernel_quantizer=None)
-        return layer
-
-    def create_larq_locallyconnected2d(self,original_layer:tfkeras.layers.LocallyConnected2D):
-        layer=larq.layers.QuantLocallyConnected2D(filters=original_layer.filters,
-        kernel_size=original_layer.kernel_size,
-        strides=original_layer.strides,
-        padding=original_layer.padding,
-        data_format=original_layer.data_format,
-        activation=original_layer.activation,
-        use_bias=original_layer.use_bias,
-        kernel_initializer=original_layer.kernel_initializer,
-        bias_initializer=original_layer.bias_initializer,
-        kernel_regularizer=original_layer.kernel_regularizer,
-        bias_regularizer=original_layer.bias_regularizer,
-        activity_regularizer=original_layer.activity_regularizer,
-        kernel_constraint=original_layer.kernel_constraint,
-        bias_constraint=original_layer.bias_constraint,
-        implementation=original_layer.implementation,
-        input_quantizer=None,
-        kernel_quantizer=None,)
-        return layer
 
     def create_larq_layer(self,original_layer):
+        """
+        Given a layer, returns None if it cannot be translated into LARQ or the corresponding Larq layer, otherwise.
+        """
+
         larq_classname=self._get_equivalent_larq_classname(layer=original_layer)
 
-        module_name=self.__MODULE_PREFIX
-        return getattr(sys.modules[module_name], larq_classname)
+        if larq_classname is None:
+            return None
+        
+        return self.__instance_larq_layer(original_layer=original_layer,larq_classname=larq_classname)
