@@ -1,7 +1,11 @@
+from configparser import ConfigParser
+from http.client import CONFLICT
 import sys, inspect
 from warnings import filters
 import larq.layers
 import tensorflow.keras as tfkeras
+
+from src import CONFIG
 
 
 class Keras2Larq:
@@ -43,27 +47,20 @@ class Keras2Larq:
         class_type= getattr(sys.modules[module_name], larq_classname)
         parameters_info= inspect.getargspec(class_type.__init__)
 
-        #TODO: get quantizer parameters from config file or program input.
-        config={"pad_values":0.0,
-        "input_quantizer":None,
-        "depthwise_quantizer":None,
-        "pointwise_quantizer":None,
-        "kernel_quantizer":None}
-
-
         #We get the values from configuration and from equivalent class in tf.keras.
         values={}
         for param in parameters_info.args:
             if param=="self":
                 continue
 
-            # If the parameter has been indicated manually, we take its value.
-            if param in config:
-                values[param]=config.get(param)
+            # If the parameter has been indicated through the configuration file, we take its value.
+            global CONFIG
+            if param in CONFIG:
+                values[param]=CONFIG.get(param)
                 continue
         
             #If no indication has been passed, we get the value from the Keras equivalent.
-            #If it doesn't exist, an Error is thrown.s
+            #If it doesn't exist, an Error is thrown.
             values[param]=getattr(original_layer, param)
 
 

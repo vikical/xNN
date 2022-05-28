@@ -1,6 +1,7 @@
 import unittest, larq
 import tensorflow as tf
 
+#import src
 from src.mappers.keras2larq import Keras2Larq
 
 class TestKeras2Larq(unittest.TestCase):
