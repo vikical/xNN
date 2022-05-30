@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 .vscode/
+models_in/
+models_out/
 
 # Distribution / packaging
 .Python
@@ -19,3 +21,6 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+#Jupyter notebook.
+.ipynb_checkpoints/
