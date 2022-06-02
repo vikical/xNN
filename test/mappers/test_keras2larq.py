@@ -107,3 +107,5 @@ class TestKeras2Larq(unittest.TestCase):
         expected="QuantLocallyConnected2D"
         obtained=bin_layer.__class__.__name__
         self.assertEqual(expected,obtained,"The layer should be translated into "+expected)
+
+

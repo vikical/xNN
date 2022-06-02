@@ -38,13 +38,12 @@ class Keras2Larq:
 
         return self.__CLASS_PREFIX+keras_classname
               
-    def __instance_larq_layer(self,original_layer,larq_classname):
+    def __instance_layer(self,original_layer,class_name,module_name):
         """
-        Instance a LARQ layer, copying common paremeters with Keras layer.
+        Instance a layer, copying common paremeters from the original layer.
         No common paremeters has to be configured or passed through the main arguments.
         """
-        module_name=self.__MODULE_PREFIX
-        class_type= getattr(sys.modules[module_name], larq_classname)
+        class_type= getattr(sys.modules[module_name], class_name)
         parameters_info= inspect.getargspec(class_type.__init__)
 
         #We get the values from configuration and from equivalent class in tf.keras.
@@ -66,9 +65,14 @@ class Keras2Larq:
 
         larq_layer= class_type(**values)
 
-        return larq_layer
+        return larq_layer              
 
-
+    def __instance_larq_layer(self,original_layer,larq_classname):
+        """
+        Instance a LARQ layer, copying common paremeters with Keras layer.
+        No common paremeters has to be configured or passed through the main arguments.
+        """
+        return self.__instance_layer(original_layer=original_layer,class_name=larq_classname,module_name=self.__MODULE_PREFIX)
 
     def create_larq_layer(self,original_layer):
         """
@@ -81,3 +85,6 @@ class Keras2Larq:
             return None
         
         return self.__instance_larq_layer(original_layer=original_layer,larq_classname=larq_classname)
+
+
+        
