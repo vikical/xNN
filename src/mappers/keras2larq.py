@@ -74,9 +74,10 @@ class Keras2Larq:
         """
         return self.__instance_layer(original_layer=original_layer,class_name=larq_classname,module_name=self.__MODULE_PREFIX)
 
-    def create_larq_layer(self,original_layer):
+    def create_larq_layer(self,original_layer, ignore_input_quantization=False):
         """
         Given a layer, returns None if it cannot be translated into LARQ or the corresponding Larq layer, otherwise.
+        If ignore_input_quantization=False, input_quantization is set to None, even if the configuration has other value.
         """
 
         larq_classname=self._get_equivalent_larq_classname(layer=original_layer)
@@ -84,7 +85,11 @@ class Keras2Larq:
         if larq_classname is None:
             return None
         
-        return self.__instance_larq_layer(original_layer=original_layer,larq_classname=larq_classname)
+        larq_layer=self.__instance_larq_layer(original_layer=original_layer,larq_classname=larq_classname)
+        if ignore_input_quantization:
+            larq_layer.input_quantizer=None
+
+        return larq_layer
 
 
         
