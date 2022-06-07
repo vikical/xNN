@@ -1,10 +1,11 @@
 from genericpath import exists
-import click, os, logging, sys, larq
+import click, logging, sys
 import tensorflow as tf
-import tensorflow_hub as hub
 from tensorflow.keras.utils import plot_model
 from tensorflow.python.keras.utils import layer_utils
 import json
+
+from src.models.model_manager import ModelManager
 
 
 def set_logging(log:str):
@@ -48,45 +49,21 @@ def solve(din,problem,metaheu,niter,search,init,memory,log,maxs):
    
 
 @xnn.command()
-@click.option("--din", type=click.Path(exists=True), help="Path to the directory where files with distances between nodes are located. This files should follow reg. exp. dist_NUMBER.txt")
-def dnn2bnn(din):
+@click.option("--fin", type=click.File(mode="r"), help="File containing the model to be binarized")
+@click.option("--fout", type=click.File(mode="w"), help="File containing the BNN model")
+def dnn2bnn(fin, fout):
     '''
     Translate a given trained dnn to its corresponding bnn.
     '''   
+    original_model=tf.keras.models.load_model(filepath=fin.name)
+    mm=ModelManager(original_model=original_model)
+    larq_model=mm.create_larq_model(original_model=original_model)
+    larq_model.save(fout.name)
 
-    model = tf.keras.Sequential([
-        hub.KerasLayer("https://tfhub.dev/adityakane2001/regnety200mf_classification/1")
-    ])
-    model.build(input_shape=(None,224,224,3))
-    my_summary=model.summary()
-
-    print("DNN layers:")
-    for layer in model.layers:
-        print(layer)
-
-    x = tf.keras.Input(shape=(28, 28, 1))  
-    y = tf.keras.layers.Conv2D(32, 3, strides=2, padding="same")(x)
-    model = tf.keras.Model(inputs=x, outputs=y)
-    model.build(input_shape=(28, 28, 1))
-    model.summary()
-
-
-    #Build BNN
-    x = tf.keras.Input(shape=(28, 28, 1))
-    y = tf.keras.layers.Flatten()(x)
-    y = larq.layers.QuantDense(
-        512, kernel_quantizer="ste_sign", kernel_constraint="weight_clip")(y)
-    y = larq.layers.QuantDense(
-        10,
-        input_quantizer="ste_sign",
-        kernel_quantizer="ste_sign",
-        kernel_constraint="weight_clip",
-        activation="softmax")(y)
-    model = tf.keras.Model(inputs=x, outputs=y)
-
-    # print("BNN layers:")
-    # for layer in model.layers:
-    #     print(layer)
+    print("ORIGINAL MODEL")
+    original_model.summary()
+    print("BINARIZED MODEL")
+    larq_model.summary()
 
 if __name__ == '__main__':
     xnn()

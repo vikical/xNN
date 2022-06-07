@@ -1,5 +1,5 @@
 {"pad_values":0.0,
-"input_quantizer":null,
-"depthwise_quantizer":null,
-"pointwise_quantizer":null,
-"kernel_quantizer":null}
+"input_quantizer":"ste_tern",
+"depthwise_quantizer":"ste_tern",
+"pointwise_quantizer":"ste_tern",
+"kernel_quantizer":"ste_tern"}
