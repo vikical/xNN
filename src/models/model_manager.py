@@ -52,7 +52,9 @@ class ModelManager:
         larq_model.build(input_shape=original_model.input_shape)
 
         #Assign by default the compilation options given by the programmer to the original_model.
-        larq_model.compile(optimizer=original_model.optimizer,
+        #NOTE: instead of copying the optimizer, we create a new one. 
+        #Reason behind: if the original_model has been trained, its learning rate isn't appropriate for the new model.
+        larq_model.compile(optimizer=original_model.optimizer.__class__.__name__,
             loss=original_model.compiled_loss._user_losses,
             loss_weights=original_model.compiled_loss._user_loss_weights,
             metrics=original_model.compiled_metrics._user_metrics,
