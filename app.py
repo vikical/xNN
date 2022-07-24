@@ -5,7 +5,11 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.python.keras.utils import layer_utils
 import json
 
-from src.models.model_manager import ModelManager
+from dnn2bnn.models.model_manager import ModelManager
+
+import json
+
+
 
 
 def set_logging(log:str):
@@ -55,8 +59,19 @@ def dnn2bnn(fin, fout):
     '''
     Translate a given trained dnn to its corresponding bnn.
     '''   
+    # Load configuration.
+    larq_configuration={"pad_values":0.0,
+    "input_quantizer":None,
+    "depthwise_quantizer":None,
+    "pointwise_quantizer":None,
+    "kernel_quantizer":None}
+
+    with open("./configuration/config.json") as json_data_file:
+        larq_configuration = json.load(json_data_file)
+
+
     original_model=tf.keras.models.load_model(filepath=fin.name)
-    mm=ModelManager(original_model=original_model)
+    mm=ModelManager(original_model=original_model,larq_configuration=larq_configuration)
     larq_model=mm.create_larq_model(original_model=original_model)
     larq_model.save(fout.name)
 

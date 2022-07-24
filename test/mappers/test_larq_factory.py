@@ -1,7 +1,7 @@
 import unittest, larq
 import tensorflow as tf
 
-from src.models.larq_factory import LarqFactory
+from dnn2bnn.models.larq_factory import LarqFactory
 
 class TestLarqFactory(unittest.TestCase):
     def setUp(self) -> None:

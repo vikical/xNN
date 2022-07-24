@@ -1,8 +1,8 @@
 import unittest, larq
 import tensorflow as tf
 
-#import src
-from src.mappers.keras2larq import Keras2Larq
+#import dnn2bnn
+from dnn2bnn.mappers.keras2larq import Keras2Larq
 
 class TestKeras2Larq(unittest.TestCase):
     def setUp(self) -> None:
