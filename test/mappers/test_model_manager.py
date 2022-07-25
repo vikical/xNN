@@ -3,7 +3,7 @@ import unittest, larq
 import tensorflow as tf
 
 #import src
-from src.models.model_manager import ModelManager
+from dnn2bnn.models.model_manager import ModelManager
 
 class TestModelManager(unittest.TestCase):
     def setUp(self) -> None:

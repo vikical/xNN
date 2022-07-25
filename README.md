@@ -63,3 +63,13 @@ We want to predict hand-written numbers (dataset: MNIST). First we train a MLP o
 # TEST
 From main folder invoke:
 python -m unittest discover test
+
+# TODO
+https://docs.larq.dev/larq/tutorials/binarynet_cifar10/
+
+# USE AS LIBRARY.
+In root directory execute:
+python setup.py bdist_wheel
+
+pip install ./dist/dnn2bnn-0.1.0-py3-none-any.whl
+pip install ./dist/dnn2bnn-0.1.0-py3-none-any.whl --force-reinstall
