@@ -39,7 +39,7 @@ class Keras2Larq:
 
         return self.__CLASS_PREFIX+keras_classname
               
-    def __instance_layer(self,original_layer,class_name,module_name):
+    def __instance_layer(self,original_layer,class_name,module_name, ignore_input_quantization):
         """
         Instance a layer, copying common paremeters from the original layer.
         No common paremeters has to be configured or passed through the main arguments.
@@ -52,6 +52,21 @@ class Keras2Larq:
         for param in parameters_info.args:
             if param=="self":
                 continue
+
+            #LARQ developers advise not to performe input_quantization in the first layer.
+            #Therefore, if indicated, we omit the quantization.
+            if param=="input_quantizer" and ignore_input_quantization:
+                values[param]=None
+                continue
+
+            #Some activation functions are not appropiated for BNN, therefore, we look into the configuration
+            #to check what we should use instead.
+            if param=="activation": 
+                activation_function=getattr(original_layer, param).__name__
+                config_param="activation_"+activation_function
+                if config_param in self.larq_configuration:
+                    values[param]=self.larq_configuration.get(config_param)
+                    continue
 
             # If the parameter has been indicated through the configuration file, we take its value.
             if param in self.larq_configuration:
@@ -67,12 +82,13 @@ class Keras2Larq:
 
         return larq_layer              
 
-    def __instance_larq_layer(self,original_layer,larq_classname):
+    def __instance_larq_layer(self,original_layer,larq_classname,ignore_input_quantization):
         """
         Instance a LARQ layer, copying common paremeters with Keras layer.
         No common paremeters has to be configured or passed through the main arguments.
         """
-        return self.__instance_layer(original_layer=original_layer,class_name=larq_classname,module_name=self.__MODULE_PREFIX)
+        return self.__instance_layer(original_layer=original_layer,class_name=larq_classname,
+        module_name=self.__MODULE_PREFIX, ignore_input_quantization=ignore_input_quantization)
 
     def create_larq_layer(self,original_layer, ignore_input_quantization=False):
         """
@@ -85,7 +101,8 @@ class Keras2Larq:
         if larq_classname is None:
             return None
         
-        larq_layer=self.__instance_larq_layer(original_layer=original_layer,larq_classname=larq_classname)
+        larq_layer=self.__instance_larq_layer(original_layer=original_layer,
+            larq_classname=larq_classname, ignore_input_quantization=ignore_input_quantization)
         if ignore_input_quantization:
             larq_layer.input_quantizer=None
 
