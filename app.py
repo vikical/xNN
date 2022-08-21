@@ -60,11 +60,13 @@ def dnn2bnn(fin, fout):
     Translate a given trained dnn to its corresponding bnn.
     '''   
     # Load configuration.
-    larq_configuration={"pad_values":0.0,
-    "input_quantizer":None,
-    "depthwise_quantizer":None,
-    "pointwise_quantizer":None,
-    "kernel_quantizer":None}
+    larq_configuration={
+        "reset_weights": False,
+        "pad_values":0.0,
+        "input_quantizer":None,
+        "depthwise_quantizer":None,
+        "pointwise_quantizer":None,
+        "kernel_quantizer":None}
 
     with open("./configuration/config.json") as json_data_file:
         larq_configuration = json.load(json_data_file)
@@ -72,7 +74,7 @@ def dnn2bnn(fin, fout):
 
     original_model=tf.keras.models.load_model(filepath=fin.name)
     mm=ModelManager(original_model=original_model,larq_configuration=larq_configuration)
-    larq_model=mm.create_larq_model(original_model=original_model)
+    larq_model=mm.create_larq_model()
     larq_model.save(fout.name)
 
     print("ORIGINAL MODEL")

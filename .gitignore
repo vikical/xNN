@@ -3,6 +3,10 @@ __pycache__/
 .vscode/
 models_in/
 models_out/
+*.txt
+*.sh
+comparison_results.ods
+*.h5
 
 # Distribution / packaging
 .Python

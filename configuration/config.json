@@ -1,5 +1,10 @@
-{"pad_values":0.0,
-"input_quantizer":"ste_tern",
-"depthwise_quantizer":"ste_tern",
-"pointwise_quantizer":"ste_tern",
-"kernel_quantizer":"ste_tern"}
+{
+"pad_values":0.0,
+"input_quantizer": "ste_sign",
+"depthwise_quantizer":"ste_sign",
+"pointwise_quantizer":"ste_sign",
+"kernel_quantizer":"ste_sign",
+"kernel_constraint":"weight_clip",
+"activation_relu": null,
+"activation_sigmoid":"sigmoid",
+"activation_softmax":"softmax"}

@@ -1,0 +1,188 @@
+import tensorflow as tf
+import tensorflow_datasets as tfds
+import json
+
+from dnn2bnn.metrics.fidelity import Fidelity
+from dnn2bnn.models.model_manager import ModelManager
+
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Flatten, Input, Conv1D, MaxPool1D, BatchNormalization
+
+#Init experiment configuration.
+batch_size=64 #64
+epoch_size= 100
+num_iter=10
+
+# Model / data parameters
+num_classes = 10
+input_shape = (32,32,3)
+
+#Load LARQ configuration.
+larq_configuration={}
+
+with open("../configuration/config.json") as json_data_file:
+    larq_configuration = json.load(json_data_file)
+
+print(larq_configuration)
+
+#Load data in PrefetchDataset. The dataset info is also loaded.
+(ds_train, ds_test), info = tfds.load(
+    'german_credit_numeric',
+    split=['train[0:85%]','train[85%:]'],
+    shuffle_files=True,
+    as_supervised=True,
+    with_info=True
+)
+
+# Print valuable info.
+print("Dataset name: " + info.name)
+
+n_features=info.features["features"].shape[0]
+print("Number of features: " + str(n_features))
+
+class_names = info.features["label"].names
+num_classes = info.features["label"].num_classes
+input_shape = (n_features,1)
+input_shape_complex= (n_features,)
+print("input shape: "+str(input_shape))
+print("# classes: " + str(num_classes) + ". Class names: " + str(class_names) )
+
+print("Dataset length")
+print(info.splits['train'])
+
+#Prepare the training dataset
+ds_train = ds_train.cache()
+ds_train = ds_train.shuffle(info.splits['train'].num_examples)
+ds_train = ds_train.batch(batch_size)
+ds_train = ds_train.prefetch(tf.data.AUTOTUNE)
+
+#Prepare the test dataset
+ds_test = ds_test.batch(batch_size)
+ds_test = ds_test.cache()
+ds_test = ds_test.prefetch(tf.data.AUTOTUNE)
+
+
+#Init accumulators.
+mlp_acc=0
+convnet_s_acc=0
+convnet_c_acc=0
+mlp_bin_acc=0
+convnet_s_bin_acc=0
+convnet_c_bin_acc=0
+mlp_fidelity=0
+convnet_s_fidelity=0
+convnet_c_fidelity=0
+
+
+for i in range(0,num_iter):
+    print("*******************************************")
+    print("ITERATION: " +str(i))
+
+    #Define MLP.
+    inputs=Input(shape=input_shape,name="input_layer")
+    layer=Flatten()(inputs)
+    layer=Dense(1024, activation='relu',name="hidden1")(layer)
+    layer=Dense(1024, activation='relu',name="hidden2")(layer)
+    layer=Dense(1024, activation='relu',name="hidden3")(layer)
+    layer=Dense(num_classes-1, activation='sigmoid',name="output_layer")(layer)
+    mlp = Model(inputs=inputs, outputs=layer)
+
+
+    #Define convnet.
+    inputs = Input(shape=input_shape)
+    # In the first layer we only quantize the weights and not the input
+    layer=Conv1D(128, 3,use_bias=False)(inputs)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Conv1D(128, 3, padding="same", use_bias=False )(layer)
+    layer=MaxPool1D(pool_size=2, strides=2)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Conv1D(256, 3, padding="same", use_bias=False)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Conv1D(256, 3, padding="same", use_bias=False)(layer)
+    layer=MaxPool1D(pool_size=2, strides=2)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Conv1D(512, 3, padding="same", use_bias=False)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Conv1D(512, 3, padding="same", use_bias=False)(layer)
+    layer=MaxPool1D(pool_size=2, strides=2)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+    layer=Flatten()(layer)
+
+    layer=Dense(1024, use_bias=False)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Dense(1024, use_bias=False)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+
+    layer=Dense(10, use_bias=False)(layer)
+    layer=BatchNormalization(momentum=0.999, scale=False)(layer)
+    layer=Dense(num_classes-1, activation="sigmoid")(layer)
+
+    convnet=Model(inputs=inputs,outputs=layer)
+
+    #Train originals
+    mlp.compile(optimizer="adam",loss='binary_crossentropy', metrics=['accuracy'])
+    #mlp.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    print("MLP trained")
+    convnet.compile(optimizer='adam',loss='binary_crossentropy', metrics=['accuracy'])
+    convnet.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    print("CONVNET trained")
+
+    #Create copies.
+    mm=ModelManager(original_model=mlp,larq_configuration=larq_configuration)
+    mlp_bin=mm.create_larq_model()    
+    #mlp_bin.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    print("MLP BIN trained")
+
+    mm=ModelManager(original_model=convnet,larq_configuration=larq_configuration)
+    convnet_simple_bin=mm.create_larq_model()    
+    convnet_simple_bin.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)     
+    print("CONVNET BIN trained")
+
+    #Test models.
+    score = mlp.evaluate(ds_test, verbose=2)
+    mlp_acc=mlp_acc+score[1]
+    print("MLP: Test loss:", score[0])
+    print("MLP: Test accuracy:", score[1])
+
+    score = convnet.evaluate(ds_test, verbose=2)
+    convnet_s_acc=convnet_s_acc+score[1]
+    print("CONVNET SIMPLE: Test loss:", score[0])
+    print("CONVNET SIMPLE: Test accuracy:", score[1])
+
+
+    score = mlp_bin.evaluate(ds_test, verbose=2)
+    mlp_bin_acc=mlp_bin_acc+score[1]
+    print("MLP BIN: Test loss:", score[0])
+    print("MLP BIN: Test accuracy:", score[1])
+
+    score = convnet_simple_bin.evaluate(ds_test, verbose=2)
+    convnet_s_bin_acc=convnet_s_bin_acc+score[1]
+    print("CONVNET BIN: Test loss:", score[0])
+    print("CONVNET BIN: Test accuracy:", score[1])
+
+    #Get fidelity.
+    fidelity=Fidelity(original=mlp, surrogate=mlp_bin,x=ds_test)    
+    fidelity_value=fidelity.accuracy(last_layer="sigmoid")
+    print("FIDELITY mlp vs mlp_bin" + str(fidelity_value))
+    mlp_fidelity=mlp_fidelity+fidelity_value
+
+    fidelity=Fidelity(original=convnet, surrogate=convnet_simple_bin,x=ds_test)
+    fidelity_s_value=fidelity.accuracy(last_layer="sigmoid")
+    print("FIDELITY convnet vs convnet_bin (SIMPLE)" + str(fidelity_s_value))
+    convnet_s_fidelity=convnet_s_fidelity+fidelity_s_value
+
+
+#Final results
+print("FINAL RESULTS******************************")
+print("MLP accuracy:", str(mlp_acc/num_iter))
+print("CONVNET accuracy:", str(convnet_s_acc/num_iter))
+print("MLP_BIN accuracy:", str(mlp_bin_acc/num_iter))
+print("CONVNET_BIN accuracy:", str(convnet_s_bin_acc/num_iter))
+print("FIDELITY mlp vs mlp_bin" + str(mlp_fidelity/num_iter))
+print("FIDELITY convnet vs convnet_bin" + str(convnet_s_fidelity/num_iter))
