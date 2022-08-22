@@ -10,7 +10,7 @@ from tensorflow.keras.utils import to_categorical
 #Init experiment configuration.
 batch_size=64 #64
 epoch_size= 100
-num_iter= 1 #10
+num_iter= 10
 
 # Model / data parameters
 num_classes = 10
