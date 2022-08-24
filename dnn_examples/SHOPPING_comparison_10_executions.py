@@ -1,3 +1,4 @@
+import numpy as np
 import tensorflow as tf
 import pandas
 import json
@@ -11,7 +12,7 @@ from tensorflow.keras.layers import Dense, Flatten, Input, Conv1D, MaxPool1D, Ba
 #Init global configuration.
 batch_size=64 #64
 epoch_size= 100
-num_iter=10
+num_iter=5
 
 #Load LARQ configuration.
 larq_configuration={}
@@ -48,15 +49,12 @@ print("Input shape:"+str(input_shape))
 print("Num. classes: "+str(num_classes))
 
 #Init accumulators.
-mlp_acc=0
-convnet_s_acc=0
-convnet_c_acc=0
-mlp_bin_acc=0
-convnet_s_bin_acc=0
-convnet_c_bin_acc=0
-mlp_fidelity=0
-convnet_s_fidelity=0
-convnet_c_fidelity=0
+mlp_acc=np.zeros(num_iter)
+convnet_acc=np.zeros(num_iter)
+mlp_bin_acc=np.zeros(num_iter)
+convnet_bin_acc=np.zeros(num_iter)
+mlp_fidelity=np.zeros(num_iter)
+convnet_fidelity=np.zeros(num_iter)
 
 for i in range(0,num_iter):
     print("*******************************************")
@@ -113,7 +111,7 @@ for i in range(0,num_iter):
     mlp.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("MLP trained")
     convnet.compile(optimizer='adam',loss='binary_crossentropy', metrics=['accuracy'])
-    #convnet.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    convnet.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("CONVNET trained")
 
     #Create copies.
@@ -123,29 +121,33 @@ for i in range(0,num_iter):
     print("MLP BIN trained")
 
     mm=ModelManager(original_model=convnet,larq_configuration=larq_configuration)
-    convnet_simple_bin=mm.create_larq_model()    
-    #convnet_simple_bin.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    convnet_bin=mm.create_larq_model()    
+    convnet_bin.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("CONVNET trained")
 
+    mlp.save("mlp_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    mlp_bin.save("mlp_bin_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    convnet.save("convnet_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    convnet_bin.save("convnet_bin_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
 
     #Test models.
     score = mlp.evaluate(x_test, y_test, verbose=2)
-    mlp_acc=mlp_acc+score[1]
+    mlp_acc[i]=score[1]
     print("MLP: Test loss:", score[0])
     print("MLP: Test accuracy:", score[1])
 
     score = convnet.evaluate(x_test, y_test, verbose=2)
-    convnet_s_acc=convnet_s_acc+score[1]
+    convnet_acc[i]=score[1]
     print("CONVNET: Test loss:", score[0])
     print("CONVNET: Test accuracy:", score[1])
 
     score = mlp_bin.evaluate(x_test, y_test, verbose=2)
-    mlp_bin_acc=mlp_bin_acc+score[1]
+    mlp_bin_acc[i]=score[1]
     print("MLP BIN: Test loss:", score[0])
     print("MLP BIN: Test accuracy:", score[1])
 
-    score = convnet_simple_bin.evaluate(x_test, y_test, verbose=2)
-    convnet_s_bin_acc=convnet_s_bin_acc+score[1]
+    score = convnet_bin.evaluate(x_test, y_test, verbose=2)
+    convnet_bin_acc[i]=score[1]
     print("CONVNET BIN: Test loss:", score[0])
     print("CONVNET BIN: Test accuracy:", score[1])
 
@@ -153,19 +155,19 @@ for i in range(0,num_iter):
     fidelity=Fidelity(original=mlp, surrogate=mlp_bin,x=x_test)    
     fidelity_value=fidelity.accuracy(last_layer="sigmoid")
     print("FIDELITY mlp vs mlp_bin" + str(fidelity_value))
-    mlp_fidelity=mlp_fidelity+fidelity_value
+    mlp_fidelity[i]=fidelity_value
 
-    fidelity=Fidelity(original=convnet, surrogate=convnet_simple_bin,x=x_test)
-    fidelity_s_value=fidelity.accuracy(last_layer="sigmoid")
-    print("FIDELITY convnet vs convnet_bin (SIMPLE)" + str(fidelity_s_value))
-    convnet_s_fidelity=convnet_s_fidelity+fidelity_s_value
+    fidelity=Fidelity(original=convnet, surrogate=convnet_bin,x=x_test)
+    fidelity_value=fidelity.accuracy(last_layer="sigmoid")
+    print("FIDELITY convnet vs convnet_bin (SIMPLE)" + str(fidelity_value))
+    convnet_fidelity[i]=fidelity_value
 
 
 #Final results
 print("FINAL RESULTS******************************")
-print("MLP accuracy:", str(mlp_acc/num_iter))
-print("CONVNET accuracy :", str(convnet_s_acc/num_iter))
-print("MLP_BIN accuracy:", str(mlp_bin_acc/num_iter))
-print("CONVNET_BIN accuracy (SIMPLE):", str(convnet_s_bin_acc/num_iter))
-print("FIDELITY mlp vs mlp_bin" + str(mlp_fidelity/num_iter))
-print("FIDELITY convnet vs convnet_bin (SIMPLE)" + str(convnet_s_fidelity/num_iter))
+print("MLP accuracy (mean,std): (" + str(np.mean(mlp_acc)) + "," + str(np.std(mlp_acc))+")")
+print("CONVNET accuracy (mean,std):"+ str(np.mean(convnet_acc)) + "," + str(np.std(convnet_acc))+")") 
+print("MLP_BIN accuracy (mean,std):"+ str(np.mean(mlp_bin_acc)) + "," + str(np.std(mlp_bin_acc))+")")
+print("CONVNET_BIN accuracy (mean,std):"+ str(np.mean(convnet_bin_acc)) + "," + str(np.std(convnet_bin_acc))+")")
+print("FIDELITY mlp vs mlp_bin (mean,std):" + str(np.mean(mlp_fidelity)) + "," + str(np.std(mlp_fidelity))+")") 
+print("FIDELITY convnet vs convnet_bin (mean,std):" + str(np.mean(convnet_fidelity)) + "," + str(np.std(convnet_fidelity))+")")
