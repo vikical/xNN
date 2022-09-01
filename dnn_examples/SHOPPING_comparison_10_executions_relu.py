@@ -17,7 +17,7 @@ num_iter=5
 #Load LARQ configuration.
 larq_configuration={}
 
-with open("../configuration/config.json") as json_data_file:
+with open("../configuration/config_relu.json") as json_data_file:
     larq_configuration = json.load(json_data_file)
 
 print(larq_configuration)

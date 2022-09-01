@@ -25,12 +25,15 @@ class ModelManager:
         #we copy it.
         if new_layer is None:
             binarized=False
-            layer_config = original_layer.get_config()  
-            new_layer = type(original_layer).from_config(layer_config)            
+            new_layer=self.__clone_layer(original_layer=original_layer)
 
         #We build the new_layer (not matter whether the layer is directly cloned or translated into LARQ)        
         return (new_layer, binarized)
 
+    def __clone_layer(self,original_layer):
+        layer_config = original_layer.get_config()  
+        new_layer = type(original_layer).from_config(layer_config)        
+        return new_layer
 
     def create_larq_model(self, reset_weights=True):
         """
@@ -43,15 +46,25 @@ class ModelManager:
 
         #Add layers.
         binarized=False
+        at_least_one_binarized=False
+
+        #Add first layer.
         (input_layer,binarized)=self.__create_layer(original_layer=original_model.layers[0])        
         larq_model.add(input_layer)        
 
-        for i in range(1,len(original_model.layers)):
+        #Add hidden layers.
+        for i in range(1,len(original_model.layers)-1):
             layer_to_be_replicated=original_model.layers[i]
             (new_layer,binarized)=self.__create_layer(original_layer=layer_to_be_replicated, 
-            ignore_input_quantization=(not binarized))
+            ignore_input_quantization=(at_least_one_binarized==False))
+            if at_least_one_binarized==False and binarized:
+                at_least_one_binarized=True
             larq_model.add(new_layer)
         
+        #Add last layer.
+        new_layer=self.__clone_layer(original_layer=original_model.layers[len(original_model.layers)-1])
+        larq_model.add(new_layer)
+
         #Build the model pointing out the input shape.
         if reset_weights:
             larq_model.build(input_shape=original_model.input_shape)

@@ -5,6 +5,6 @@
 "pointwise_quantizer":"ste_sign",
 "kernel_quantizer":"ste_sign",
 "kernel_constraint":"weight_clip",
-"activation_relu": null,
+"activation_relu": "relu",
 "activation_sigmoid":"sigmoid",
 "activation_softmax":"softmax"}

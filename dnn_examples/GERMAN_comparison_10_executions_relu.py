@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import pandas
+import tensorflow_datasets as tfds
 import json
 
 from dnn2bnn.metrics.fidelity import Fidelity
@@ -9,44 +9,59 @@ from dnn2bnn.models.model_manager import ModelManager
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Flatten, Input, Conv1D, MaxPool1D, BatchNormalization
 
-#Init global configuration.
+#Init experiment configuration.
 batch_size=64 #64
 epoch_size= 100
 num_iter=5
 
+# Model / data parameters
+num_classes = 10
+input_shape = (32,32,3)
+
 #Load LARQ configuration.
 larq_configuration={}
 
-with open("../configuration/config.json") as json_data_file:
+with open("../configuration/config_relu.json") as json_data_file:
     larq_configuration = json.load(json_data_file)
 
 print(larq_configuration)
 
-#Load data.
-df=pandas.read_csv('online_shoppers_intention_preprocess.csv')
+#Load data in PrefetchDataset. The dataset info is also loaded.
+(ds_train, ds_test), info = tfds.load(
+    'german_credit_numeric',
+    split=['train[0:85%]','train[85%:]'],
+    shuffle_files=True,
+    as_supervised=True,
+    with_info=True
+)
 
-#Split training and test.
-num_samples=len(df)
-boundary_index=round(num_samples*0.85)
+# Print valuable info.
+print("Dataset name: " + info.name)
 
-df_train=df[0:boundary_index]
-df_test=df[boundary_index:]
+n_features=info.features["features"].shape[0]
+print("Number of features: " + str(n_features))
 
-print("Num. samples:"+str(num_samples)+ ". Training samples: " + str(len(df_train))+". Test samples: "+str(len(df_test)))
+class_names = info.features["label"].names
+num_classes = info.features["label"].num_classes
+input_shape = (n_features,1)
+input_shape_complex= (n_features,)
+print("input shape: "+str(input_shape))
+print("# classes: " + str(num_classes) + ". Class names: " + str(class_names) )
 
+print("Dataset length")
+print(info.splits['train'])
 
-#Split features from label.
-x_train=df_train.iloc[:,0:df.columns.size-1].to_numpy()
-y_train=df_train.iloc[:,-1:].to_numpy()
+#Prepare the training dataset
+ds_train = ds_train.cache()
+ds_train = ds_train.shuffle(info.splits['train'].num_examples)
+ds_train = ds_train.batch(batch_size)
+ds_train = ds_train.prefetch(tf.data.AUTOTUNE)
 
-x_test=df_test.iloc[:,0:df.columns.size-1].to_numpy()
-y_test=df_test.iloc[:,-1:].to_numpy()
+#Prepare the test dataset
+ds_test = ds_test.batch(batch_size)
+ds_test = ds_test.cache()
+ds_test = ds_test.prefetch(tf.data.AUTOTUNE)
 
-#Input shape
-input_shape=(df.columns.size-1,1)
-num_classes=2
-print("Input shape:"+str(input_shape))
-print("Num. classes: "+str(num_classes))
 
 #Init accumulators.
 mlp_acc=np.zeros(num_iter)
@@ -55,6 +70,7 @@ mlp_bin_acc=np.zeros(num_iter)
 convnet_bin_acc=np.zeros(num_iter)
 mlp_fidelity=np.zeros(num_iter)
 convnet_fidelity=np.zeros(num_iter)
+
 
 for i in range(0,num_iter):
     print("*******************************************")
@@ -69,7 +85,8 @@ for i in range(0,num_iter):
     layer=Dense(num_classes-1, activation='sigmoid',name="output_layer")(layer)
     mlp = Model(inputs=inputs, outputs=layer)
 
-    #Define convnet simple.
+
+    #Define convnet.
     inputs = Input(shape=input_shape)
     # In the first layer we only quantize the weights and not the input
     layer=Conv1D(128, 3,use_bias=False)(inputs)
@@ -108,56 +125,57 @@ for i in range(0,num_iter):
 
     #Train originals
     mlp.compile(optimizer="adam",loss='binary_crossentropy', metrics=['accuracy'])
-    mlp.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    mlp.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("MLP trained")
     convnet.compile(optimizer='adam',loss='binary_crossentropy', metrics=['accuracy'])
-    convnet.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    convnet.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("CONVNET trained")
 
     #Create copies.
     mm=ModelManager(original_model=mlp,larq_configuration=larq_configuration)
     mlp_bin=mm.create_larq_model()    
-    mlp_bin.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    mlp_bin.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
     print("MLP BIN trained")
 
     mm=ModelManager(original_model=convnet,larq_configuration=larq_configuration)
     convnet_bin=mm.create_larq_model()    
-    convnet_bin.fit(x_train, y_train, epochs=epoch_size, batch_size=batch_size,verbose=2)  
+    convnet_bin.fit(ds_train, epochs=epoch_size, batch_size=batch_size,verbose=2)     
     print("CONVNET BIN trained")
 
-    mlp.save("mlp_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
-    mlp_bin.save("mlp_bin_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
-    convnet.save("convnet_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
-    convnet_bin.save("convnet_bin_shopping_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    #Save models.
+    mlp.save("mlp_german_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    mlp_bin.save("mlp_bin_german_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    convnet.save("convnet_german_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
+    convnet_bin.save("convnet_bin_german_i"+str(i)+str(larq_configuration["activation_relu"])+".h5")
 
     #Test models.
-    score = mlp.evaluate(x_test, y_test, verbose=2)
+    score = mlp.evaluate(ds_test, verbose=2)
     mlp_acc[i]=score[1]
     print("MLP: Test loss:", score[0])
     print("MLP: Test accuracy:", score[1])
 
-    score = convnet.evaluate(x_test, y_test, verbose=2)
+    score = convnet.evaluate(ds_test, verbose=2)
     convnet_acc[i]=score[1]
-    print("CONVNET: Test loss:", score[0])
-    print("CONVNET: Test accuracy:", score[1])
+    print("CONVNET SIMPLE: Test loss:", score[0])
+    print("CONVNET SIMPLE: Test accuracy:", score[1])
 
-    score = mlp_bin.evaluate(x_test, y_test, verbose=2)
+    score = mlp_bin.evaluate(ds_test, verbose=2)
     mlp_bin_acc[i]=score[1]
     print("MLP BIN: Test loss:", score[0])
     print("MLP BIN: Test accuracy:", score[1])
 
-    score = convnet_bin.evaluate(x_test, y_test, verbose=2)
+    score = convnet_bin.evaluate(ds_test, verbose=2)
     convnet_bin_acc[i]=score[1]
     print("CONVNET BIN: Test loss:", score[0])
     print("CONVNET BIN: Test accuracy:", score[1])
 
     #Get fidelity.
-    fidelity=Fidelity(original=mlp, surrogate=mlp_bin,x=x_test)    
+    fidelity=Fidelity(original=mlp, surrogate=mlp_bin,x=ds_test)    
     fidelity_value=fidelity.accuracy(last_layer="sigmoid")
     print("FIDELITY mlp vs mlp_bin" + str(fidelity_value))
     mlp_fidelity[i]=fidelity_value
 
-    fidelity=Fidelity(original=convnet, surrogate=convnet_bin,x=x_test)
+    fidelity=Fidelity(original=convnet, surrogate=convnet_bin,x=ds_test)
     fidelity_value=fidelity.accuracy(last_layer="sigmoid")
     print("FIDELITY convnet vs convnet_bin (SIMPLE)" + str(fidelity_value))
     convnet_fidelity[i]=fidelity_value
